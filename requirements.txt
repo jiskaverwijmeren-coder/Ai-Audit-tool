@@ -9,4 +9,5 @@ python-dotenv
 openai-whisper
 streamlit-mic-recorder
 torch
+torchvision
 python-docx
