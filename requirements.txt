@@ -1,0 +1,12 @@
+streamlit
+sentence-transformers
+scikit-learn
+nltk
+mistralai
+PyPDF2
+pandas
+python-dotenv
+openai-whisper
+streamlit-mic-recorder
+torch
+python-docx
