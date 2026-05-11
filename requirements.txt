@@ -2,7 +2,7 @@ streamlit
 sentence-transformers
 scikit-learn
 nltk
-mistralai>=1.0.0
+mistralai==1.2.5
 PyPDF2
 pandas
 python-dotenv
