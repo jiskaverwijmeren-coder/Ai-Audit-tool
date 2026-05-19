@@ -73,7 +73,9 @@ if "thema" not in st.session_state:
 if "chat_geschiedenis" not in st.session_state:
     st.session_state.chat_geschiedenis = {}
 if "document_list" not in st.session_state:
-    st.session_state.document_list = []
+    st.session_state.document_list = [] 
+if "live_audit_log" not in st.session_state:
+    st.session_state.live_audit_log = []
 
 thema = st.session_state.thema
 
@@ -775,8 +777,9 @@ with tab2:
 
                 if not sentences:
                   st.warning("Geen tekst gevonden in de transcriptie.")
+                  risk_results = []
                 else:
-                    risk_results = detect_problem_sentences(sentences, threshold=0.30)
+                 risk_results = detect_problem_sentences(sentences, threshold=0.30)
 
                 # 3. Generate follow-up questions per risk signal
                 follow_up_questions = []
@@ -791,12 +794,16 @@ with tab2:
                 )
                 iso_data = haal_gecachete_analyse_op(api_key, st.session_state.transcribed_text, actieve_normen)
 
-                st.session_state.live_audit_results = {
-                    "summary": summary,
-                    "risk_results": risk_results,
-                    "follow_up_questions": follow_up_questions,
-                    "iso_data": iso_data,
-                }
+                live_result = {
+                "timestamp": time.strftime("%H:%M:%S"),
+                "transcriptie": st.session_state.transcribed_text,
+                "summary": summary,
+                "risk_results": risk_results,
+               "follow_up_questions": follow_up_questions,
+             "iso_data": iso_data,
+             }
+            st.session_state.live_audit_results = live_result
+            st.session_state.live_audit_log.append(live_result)
 
             # Display live results
             st.divider()
@@ -843,3 +850,49 @@ with tab2:
                                 d["text"] = st.session_state.transcribed_text
                         st.info("🔄 Bestaande opname bijgewerkt. Ga naar de Documentanalyse tab.")
                     st.rerun()
+                    # ── Session Log ──
+if st.session_state.live_audit_log:
+    st.divider()
+    st.subheader("🗂️ Sessie Log")
+    st.caption(f"{len(st.session_state.live_audit_log)} opname(s) deze sessie")
+
+    if st.button("🗑️ Wis sessie log"):
+        st.session_state.live_audit_log = []
+        st.rerun()
+
+    for i, entry in enumerate(reversed(st.session_state.live_audit_log), 1):
+        with st.expander(f"Opname {len(st.session_state.live_audit_log) - i + 1} — {entry['timestamp']}"):
+            st.markdown(f"**Samenvatting:** {entry['summary']}")
+            st.markdown(f"**Risicosignalen:** {len(entry['risk_results'])}")
+            st.markdown(f"**ISO bevindingen:** {len(entry['iso_data']['bevindingen'])}")
+
+            # Word download per entry
+            doc = Document()
+            doc.add_heading(f"Live Audit Opname — {entry['timestamp']}", 0)
+            doc.add_heading("Transcriptie", level=1)
+            doc.add_paragraph(entry["transcriptie"])
+            doc.add_heading("Samenvatting", level=1)
+            doc.add_paragraph(entry["summary"])
+            doc.add_heading("Risicosignalen", level=1)
+            for j, risk in enumerate(entry["risk_results"], 1):
+                doc.add_heading(f"{j}. {risk['issue_type'].upper()} (score: {risk['score']:.2f})", level=2)
+                doc.add_paragraph(risk["sentence"])
+                if j <= len(entry["follow_up_questions"]):
+                    doc.add_heading("Opvolgingsvragen", level=3)
+                    doc.add_paragraph(entry["follow_up_questions"][j - 1])
+            doc.add_heading("ISO Bevindingen", level=1)
+            for b in entry["iso_data"]["bevindingen"]:
+                doc.add_heading(f"{b['norm']} | {b['clausule']}: {b['titel']}", level=2)
+                doc.add_paragraph(f"Ernst: {b['ernst'].capitalize()}")
+                doc.add_paragraph(f"Probleem: {b['beschrijving']}")
+                doc.add_paragraph(f"Aanbeveling: {b['aanbeveling']}")
+            bio = io.BytesIO()
+            doc.save(bio)
+
+            st.download_button(
+                "📄 Download Word rapport",
+                data=bio.getvalue(),
+                file_name=f"live_audit_{entry['timestamp'].replace(':', '')}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                key=f"dl_log_{i}"
+            )
