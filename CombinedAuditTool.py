@@ -776,7 +776,7 @@ with tab2:
                 if not sentences:
                   st.warning("Geen tekst gevonden in de transcriptie.")
                 else:
-                    risk_results = detect_problem_sentences(sentences, threshold=...)
+                    risk_results = detect_problem_sentences(sentences, threshold=0.30)
 
                 # 3. Generate follow-up questions per risk signal
                 follow_up_questions = []
