@@ -537,7 +537,7 @@ with tab1:
                 st.markdown(f"### 🔄 Bezig met: **{doc_name}**")
 
                 geschatte_tokens = len(raw_text) // 4
-                MAX_TOKENS = 25000
+                MAX_TOKENS = 50000
                 if geschatte_tokens > MAX_TOKENS:
                     st.error(f"❌ '{doc_name}' is te groot ({geschatte_tokens} tokens, max {MAX_TOKENS}). Overgeslagen.")
                     continue
