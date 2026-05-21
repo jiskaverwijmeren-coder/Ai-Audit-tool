@@ -76,6 +76,8 @@ if "document_list" not in st.session_state:
     st.session_state.document_list = [] 
 if "live_audit_log" not in st.session_state:
     st.session_state.live_audit_log = []
+if "all_results" not in st.session_state:         
+    st.session_state.all_results = {}
 
 thema = st.session_state.thema
 
@@ -384,7 +386,53 @@ def genereer_word_rapport(doc_name, data, context, gefilterde_bevindingen):
     bio = io.BytesIO()
     doc.save(bio)
     return bio.getvalue()
+def genereer_totaal_word_rapport(all_results, context):
+    doc = Document()
+    doc.add_heading("ISO Totaalrapport — Alle Documenten", 0)
+    if context:
+        doc.add_heading("Project Context", level=1)
+        doc.add_paragraph(context)
 
+    for doc_name, res in all_results.items():
+        data = res["iso_data"]
+        doc.add_heading(f"Document: {doc_name}", level=1)
+        doc.add_heading("Management Samenvatting", level=2)
+        doc.add_paragraph(data["samenvatting"])
+        doc.add_heading(f"Bevindingen ({len(data['bevindingen'])})", level=2)
+        for b in data["bevindingen"]:
+            doc.add_heading(f"{b['norm']} - {b['clausule']}: {b['titel']}", level=3)
+            doc.add_paragraph(f"Ernst: {b['ernst'].capitalize()}")
+            doc.add_paragraph(f"Probleem: {b['beschrijving']}")
+            doc.add_paragraph(f"Aanbeveling: {b['aanbeveling']}")
+        doc.add_page_break()
+
+    bio = io.BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
+
+
+def genereer_vragen_word_rapport(all_results):
+    doc = Document()
+    doc.add_heading("Auditopvolgingsvragen — Alle Documenten", 0)
+
+    for doc_name, res in all_results.items():
+        risk_results = res["risk_results"]
+        if not risk_results:
+            continue
+        doc.add_heading(f"Document: {doc_name}", level=1)
+        for i, item in enumerate(risk_results, 1):
+            doc.add_heading(
+                f"Vraagset {i} — {item['issue_type'].upper()} (score: {item['score']:.2f})",
+                level=2
+            )
+            doc.add_paragraph(f"Gemarkeerde zin:\n\"{item['sentence']}\"")
+            doc.add_heading("Auditopvolgingsvragen:", level=3)
+            doc.add_paragraph(item["questions"])
+        doc.add_page_break()
+
+    bio = io.BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
 # =========================
 # TABS
 # =========================
@@ -537,7 +585,7 @@ with tab1:
                 st.markdown(f"### 🔄 Bezig met: **{doc_name}**")
 
                 geschatte_tokens = len(raw_text) // 4
-                MAX_TOKENS = 50000
+                MAX_TOKENS = 25000
                 if geschatte_tokens > MAX_TOKENS:
                     st.error(f"❌ '{doc_name}' is te groot ({geschatte_tokens} tokens, max {MAX_TOKENS}). Overgeslagen.")
                     continue
@@ -592,8 +640,36 @@ with tab1:
     if "all_results" in st.session_state and st.session_state.all_results:
         st.divider()
         st.header("📊 Analyseresultaten")
+    if len(st.session_state.all_results) > 1:
+     st.subheader("📦 Totaalrapporten (alle documenten)")
+    col_tot1, col_tot2 = st.columns(2)
 
-        for doc_name, res in st.session_state.all_results.items():
+    with col_tot1:
+        totaal_word = genereer_totaal_word_rapport(
+            st.session_state.all_results, project_context
+        )
+        st.download_button(
+            "📄 Download ISO Totaalrapport (Word)",
+            data=totaal_word,
+            file_name="iso_totaalrapport.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
+            key="dl_totaal_iso"
+        )
+
+    with col_tot2:
+        vragen_word = genereer_vragen_word_rapport(st.session_state.all_results)
+        st.download_button(
+            "❓ Download Vragenrapport (Word)",
+            data=vragen_word,
+            file_name="auditopvolgingsvragen.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            use_container_width=True,
+            key="dl_totaal_vragen"
+        )
+    st.divider()
+
+    for doc_name, res in st.session_state.all_results.items():
             with st.expander(f"📄 {doc_name}", expanded=True):
 
                 # Risk Scanner Results
