@@ -12,3 +12,4 @@ torch
 torchvision
 python-docx
 PyPDF2
+supabase
