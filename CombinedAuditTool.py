@@ -723,4 +723,181 @@ with tab2:
                     model="mistral-large-latest",
                     messages=[{"role": "user", "content": f'Vat het volgende antwoord van de auditee samen in 1-2 zinnen:\n"{st.session_state.transcribed_text}"'}],
                     temperature=0.2, max_tokens=150
-                    )
+                )
+                summary = summary_response.choices[0].message.content.strip()
+
+                sentences = split_into_sentences(st.session_state.transcribed_text)
+                if not sentences:
+                    st.warning("Geen tekst gevonden in de transcriptie.")
+                    risk_results = []
+                else:
+                    risk_results = detect_problem_sentences(sentences, threshold=threshold)
+
+                follow_up_questions = []
+                for item in risk_results:
+                    follow_up_questions.append(generate_audit_questions(client, item["sentence"], item["issue_type"]))
+
+                actieve_normen = tuple(
+                    n for n, enabled in [("ISO 9001", enable_9001), ("ISO 14001", enable_14001), ("ISO 45001", enable_45001)]
+                    if enabled
+                )
+                iso_data = haal_gecachete_analyse_op(api_key, st.session_state.transcribed_text, actieve_normen)
+
+                live_result = {
+                    "timestamp": time.strftime("%H:%M:%S"),
+                    "transcriptie": st.session_state.transcribed_text,
+                    "summary": summary,
+                    "risk_results": risk_results,
+                    "follow_up_questions": follow_up_questions,
+                    "iso_data": iso_data,
+                }
+                st.session_state.live_audit_results = live_result
+                st.session_state.live_audit_log.append(live_result)
+
+            st.divider()
+            st.subheader("🔍 Live Audit Analyse")
+
+            st.markdown("### 📝 Samenvatting")
+            st.info(st.session_state.live_audit_results["summary"])
+
+            st.markdown("### 🚨 Risicosignalen & Opvolgingsvragen")
+            if st.session_state.live_audit_results["risk_results"]:
+                for i, risk in enumerate(st.session_state.live_audit_results["risk_results"], 1):
+                    st.markdown(f"**{i}. {risk['issue_type'].upper()}** (score: {risk['score']:.2f})")
+                    st.markdown(f"> *{risk['sentence']}*")
+                    if i <= len(st.session_state.live_audit_results["follow_up_questions"]):
+                        st.markdown("**Voorgestelde opvolgvragen:**")
+                        st.markdown(st.session_state.live_audit_results["follow_up_questions"][i - 1])
+                    st.write("")
+            else:
+                st.success("✅ Geen risicosignalen gedetecteerd in deze opname.")
+
+            st.markdown("### 🏗️ Gekoppelde ISO Clausules")
+            if st.session_state.live_audit_results["iso_data"]["bevindingen"]:
+                for b in st.session_state.live_audit_results["iso_data"]["bevindingen"]:
+                    ernst_kleur = {"hoog": "🔴", "gemiddeld": "🟠", "laag": "🟡"}.get(b["ernst"], "⚪")
+                    st.markdown(f"- {ernst_kleur} **[{b['norm']} | {b['clausule']}] {b['titel']}**")
+            else:
+                st.info("Geen ISO-clausules gekoppeld aan deze transcriptie.")
+
+            col_wis, col_toevoegen = st.columns(2)
+            with col_wis:
+                if st.button("🗑️ Wis live auditresultaten"):
+                    del st.session_state.live_audit_results
+                    st.rerun()
+            with col_toevoegen:
+                if st.button("➕ Voeg opname toe aan documentenlijst"):
+                    name = "🎤 Live Opname"
+                    existing_names = [d["name"] for d in st.session_state.document_list]
+                    if name not in existing_names:
+                        st.session_state.document_list.append({"name": name, "text": st.session_state.transcribed_text})
+                        st.success("✅ Toegevoegd! Ga naar de Documentanalyse tab.")
+                    else:
+                        for d in st.session_state.document_list:
+                            if d["name"] == name:
+                                d["text"] = st.session_state.transcribed_text
+                        st.info("🔄 Bestaande opname bijgewerkt.")
+                    st.rerun()
+
+    if st.session_state.live_audit_log:
+        st.divider()
+        st.subheader("🗂️ Sessie Log")
+        st.caption(f"{len(st.session_state.live_audit_log)} opname(s) deze sessie")
+
+        if st.button("🗑️ Wis sessie log"):
+            st.session_state.live_audit_log = []
+            st.rerun()
+
+        for i, entry in enumerate(reversed(st.session_state.live_audit_log), 1):
+            with st.expander(f"Opname {len(st.session_state.live_audit_log) - i + 1} — {entry['timestamp']}"):
+                st.markdown(f"**Samenvatting:** {entry['summary']}")
+                st.markdown(f"**Risicosignalen:** {len(entry['risk_results'])}")
+                st.markdown(f"**ISO bevindingen:** {len(entry['iso_data']['bevindingen'])}")
+
+                doc = Document()
+                doc.add_heading(f"Live Audit Opname — {entry['timestamp']}", 0)
+                doc.add_heading("Transcriptie", level=1)
+                doc.add_paragraph(entry["transcriptie"])
+                doc.add_heading("Samenvatting", level=1)
+                doc.add_paragraph(entry["summary"])
+                doc.add_heading("Risicosignalen", level=1)
+                for j, risk in enumerate(entry["risk_results"], 1):
+                    doc.add_heading(f"{j}. {risk['issue_type'].upper()} (score: {risk['score']:.2f})", level=2)
+                    doc.add_paragraph(risk["sentence"])
+                    if j <= len(entry["follow_up_questions"]):
+                        doc.add_heading("Opvolgingsvragen", level=3)
+                        doc.add_paragraph(entry["follow_up_questions"][j - 1])
+                doc.add_heading("ISO Bevindingen", level=1)
+                for b in entry["iso_data"]["bevindingen"]:
+                    doc.add_heading(f"{b['norm']} | {b['clausule']}: {b['titel']}", level=2)
+                    doc.add_paragraph(f"Ernst: {b['ernst'].capitalize()}")
+                    doc.add_paragraph(f"Probleem: {b['beschrijving']}")
+                    doc.add_paragraph(f"Aanbeveling: {b['aanbeveling']}")
+                bio = io.BytesIO()
+                doc.save(bio)
+
+                st.download_button(
+                    "📄 Download Word rapport", data=bio.getvalue(),
+                    file_name=f"live_audit_{entry['timestamp'].replace(':', '')}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key=f"dl_log_{i}"
+                )
+
+# =========================================================
+# TAB 3 — FEEDBACKBEHEER
+# =========================================================
+
+with tab3:
+    st.subheader("🧪 Feedbackbeheer")
+    st.info(
+        "Feedback wordt opgeslagen in Supabase en blijft bewaard na het herladen van de pagina. "
+        "Bij de volgende analyse worden jouw beoordelingen automatisch meegestuurd aan Mistral als voorbeelden."
+    )
+
+    feedback = st.session_state.feedback_store
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.markdown(f"### 👍 Goede voorbeelden ({len(feedback['goede_vragen'])})")
+        if not feedback["goede_vragen"]:
+            st.info("Nog geen goede voorbeelden opgeslagen.")
+        for i, entry in enumerate(reversed(feedback["goede_vragen"]), 1):
+            with st.expander(f"{i}. {entry['issue_type'].upper()}"):
+                st.markdown(f"**Zin:** {entry['zin']}")
+                st.markdown(f"**Vragen:**\n{entry['vragen']}")
+                if st.button("🗑️ Verwijder", key=f"del_goed_{i}"):
+                    verwijder_feedback_supabase(entry["zin"], entry["issue_type"])
+                    st.session_state.feedback_store = laad_feedback_supabase()
+                    st.rerun()
+
+    with col2:
+        st.markdown(f"### 👎 Slechte voorbeelden ({len(feedback['slechte_vragen'])})")
+        if not feedback["slechte_vragen"]:
+            st.info("Nog geen slechte voorbeelden opgeslagen.")
+        for i, entry in enumerate(reversed(feedback["slechte_vragen"]), 1):
+            with st.expander(f"{i}. {entry['issue_type'].upper()}"):
+                st.markdown(f"**Zin:** {entry['zin']}")
+                st.markdown(f"**Vragen:**\n{entry['vragen']}")
+                if st.button("🗑️ Verwijder", key=f"del_slecht_{i}"):
+                    verwijder_feedback_supabase(entry["zin"], entry["issue_type"])
+                    st.session_state.feedback_store = laad_feedback_supabase()
+                    st.rerun()
+
+    st.divider()
+    if st.button("🗑️ Wis alle feedback", type="secondary"):
+        try:
+            supabase_client.table("audit_feedback").delete().neq("id", "").execute()
+            st.session_state.feedback_store = {"goede_vragen": [], "slechte_vragen": []}
+            st.rerun()
+        except Exception as e:
+            st.error(f"Fout: {e}")
+
+    st.divider()
+    st.subheader("📊 Hoe werkt de feedbackloop?")
+    st.markdown("""
+    1. **Analyseer een document** in de eerste tab
+    2. **Beoordeel de vraagsets** met 👍 of 👎
+    3. **Bij de volgende analyse** stuurt het systeem jouw beoordelingen automatisch mee als voorbeelden aan Mistral
+    4. **Mistral past zijn antwoorden aan** op basis van wat jij goed of slecht vond
+    5. **De feedback blijft bewaard** in Supabase, ook na het herladen van de pagina
+    """)
