@@ -606,27 +606,6 @@ with tab1:
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True, key="dl_totaal_vragen"
                 )
-                highlighted_phrases = []
-                if res["risk_results"]:
-                  highlighted_phrases.extend([item["sentence"] for item in res["risk_results"]])
-                if res["iso_data"]["bevindingen"]:
-                  highlighted_phrases.extend([b["beschrijving"] for b in res["iso_data"]["bevindingen"]])
-
-                # Genereer de gemarkeerde PDF
-                highlighted_pdf = highlight_text_in_pdf(
-                   original_text=res["raw_text"],
-                   highlighted_phrases=highlighted_phrases,
-                )
-
-                # Downloadknop voor de gemarkeerde PDF
-                st.download_button(
-                    label="📄 Download Document met Highlights (PDF)",
-                    data=highlighted_pdf,
-                    file_name=f"gemarkeerd_{doc_name}.pdf",
-                    mime="application/pdf",
-                    use_container_width=True,
-                    key=f"highlighted_pdf_{doc_name}"
-                )
             st.divider()
 
         for doc_name, res in st.session_state.all_results.items():
@@ -712,6 +691,27 @@ with tab1:
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             use_container_width=True, key=f"word_{doc_name}"
                         )
+                        highlighted_phrases = []
+                if res["risk_results"]:
+                  highlighted_phrases.extend([item["sentence"] for item in res["risk_results"]])
+                if res["iso_data"]["bevindingen"]:
+                  highlighted_phrases.extend([b["beschrijving"] for b in res["iso_data"]["bevindingen"]])
+
+                # Genereer de gemarkeerde PDF
+                highlighted_pdf = highlight_text_in_pdf(
+                   original_text=res["raw_text"],
+                   highlighted_phrases=highlighted_phrases,
+                )
+
+                # Downloadknop voor de gemarkeerde PDF
+                st.download_button(
+                    label="📄 Download Document met Highlights (PDF)",
+                    data=highlighted_pdf,
+                    file_name=f"gemarkeerd_{doc_name}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key=f"highlighted_pdf_{doc_name}"
+                )
 
                     st.write("")
                     for b in gefilterd:
