@@ -29,29 +29,26 @@ ISO_KLEUREN = {
 def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list, risk_results: list = []) -> bytes:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
-    # ISO bevindingen highlighten per norm (zoals voorheen)
+    # ISO bevindingen highlighten via citaat
     for b in bevindingen:
         norm = b.get("norm", "")
         kleur = ISO_KLEUREN.get(norm, [1.0, 1.0, 0.0])
-        zoektermen = []
-        beschrijving = b.get("beschrijving", "")
-        if beschrijving:
+
+        citaat = b.get("citaat", "")
+        if not citaat:
+            beschrijving = b.get("beschrijving", "")
             woorden = beschrijving.split()
-            chunk = " ".join(woorden[:8])
-            if chunk:
-                zoektermen.append(chunk)
-        titel = b.get("titel", "")
-        if titel and len(titel) > 5:
-            zoektermen.append(titel)
-        for pagina in doc:
-            for term in zoektermen:
-                hits = pagina.search_for(term)
+            citaat = " ".join(woorden[:8])
+
+        if citaat:
+            for pagina in doc:
+                hits = pagina.search_for(citaat)
                 for rect in hits:
                     highlight = pagina.add_highlight_annot(rect)
                     highlight.set_colors(stroke=kleur)
                     highlight.update()
 
-    # Risk Scanner zinnen highlighten in geel (deze komen letterlijk uit de PDF)
+    # Risk Scanner zinnen highlighten in geel
     for item in risk_results:
         zin = item.get("sentence", "")
         if not zin:
@@ -60,11 +57,10 @@ def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list, risk_resu
             hits = pagina.search_for(zin)
             for rect in hits:
                 highlight = pagina.add_highlight_annot(rect)
-                highlight.set_colors(stroke=[1.0, 1.0, 0.0])  # geel
+                highlight.set_colors(stroke=[1.0, 1.0, 0.0])
                 highlight.update()
 
-    # ... rest van de legenda code blijft hetzelfde
-
+    # Legenda rechtsonder op de laatste pagina
     laatste_pagina = doc[-1]
     pagina_breedte = laatste_pagina.rect.width
     pagina_hoogte = laatste_pagina.rect.height
@@ -73,22 +69,18 @@ def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list, risk_resu
     x = pagina_breedte - breedte_box - 20
     y = pagina_hoogte - hoogte_box - 20
 
-    # Witte achtergrond voor de legenda
     laatste_pagina.draw_rect(
         fitz.Rect(x - 5, y - 5, x + breedte_box, y + hoogte_box),
         color=(0, 0, 0), fill=(1, 1, 1), width=0.5
     )
-
     laatste_pagina.insert_text((x, y + 12), "Legenda ISO highlights:", fontsize=9, color=(0, 0, 0), fontname="helv")
 
     for i, (norm, kleur) in enumerate(ISO_KLEUREN.items()):
         ry = y + 26 + (i * 22)
-        # Gekleurd blokje
         laatste_pagina.draw_rect(
             fitz.Rect(x, ry, x + 16, ry + 12),
             color=kleur, fill=kleur, width=0
         )
-        # Naam van de norm
         laatste_pagina.insert_text((x + 22, ry + 10), norm, fontsize=8, color=(0, 0, 0), fontname="helv")
 
     return doc.tobytes()
