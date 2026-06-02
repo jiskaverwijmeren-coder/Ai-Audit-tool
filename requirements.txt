@@ -13,3 +13,5 @@ torchvision
 python-docx
 PyPDF2
 supabase
+reportlab>=4.0.0
+PyPDF2>=3.0.0
