@@ -723,3 +723,4 @@ with tab2:
                     model="mistral-large-latest",
                     messages=[{"role": "user", "content": f'Vat het volgende antwoord van de auditee samen in 1-2 zinnen:\n"{st.session_state.transcribed_text}"'}],
                     temperature=0.2, max_tokens=150
+                    )
