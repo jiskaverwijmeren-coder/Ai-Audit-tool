@@ -574,13 +574,19 @@ with tab1:
                     risico_zinnen_blok = f"\n\nAL GEDETECTEERDE RISICOZINNEN (gebruik dit als extra context):\n{risico_zinnen}"
                 
                 if project_context:
+                    with st.spinner(f"🔍 Risk Scanner: {doc_name}..."):
+                    sentences = split_into_sentences(raw_text)
+                    detected = detect_problem_sentences(sentences, threshold=threshold)
+                
+                risico_zinnen_blok = ""
+                if detected:
+                    risico_zinnen = "\n".join([f"- {r['sentence']} ({r['issue_type']})" for r in detected])
+                    risico_zinnen_blok = f"\n\nAL GEDETECTEERDE RISICOZINNEN (gebruik dit als extra context):\n{risico_zinnen}"
+                
+                if project_context:
                     tekst_voor_analyse = f"CONTEXT:\n{project_context}\n\nDOCUMENT:\n{raw_text}{risico_zinnen_blok}"
                 else:
                     tekst_voor_analyse = f"{raw_text}{risico_zinnen_blok}"
-
-                with st.spinner(f"🔍 Risk Scanner: {doc_name}..."):
-                    sentences = split_into_sentences(raw_text)
-                    detected = detect_problem_sentences(sentences, threshold=threshold)
 
                 risk_results = []
                 if detected:
