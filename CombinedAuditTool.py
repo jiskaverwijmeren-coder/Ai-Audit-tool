@@ -568,7 +568,15 @@ with tab1:
                     st.error(f"❌ '{doc_name}' is te groot ({geschatte_tokens} tokens, max {MAX_TOKENS}). Overgeslagen.")
                     continue
 
-                tekst_voor_analyse = f"CONTEXT:\n{project_context}\n\nDOCUMENT:\n{raw_text}" if project_context else raw_text
+                risico_zinnen_blok = ""
+                if detected:
+                    risico_zinnen = "\n".join([f"- {r['sentence']} ({r['issue_type']})" for r in detected])
+                    risico_zinnen_blok = f"\n\nAL GEDETECTEERDE RISICOZINNEN (gebruik dit als extra context):\n{risico_zinnen}"
+                
+                if project_context:
+                    tekst_voor_analyse = f"CONTEXT:\n{project_context}\n\nDOCUMENT:\n{raw_text}{risico_zinnen_blok}"
+                else:
+                    tekst_voor_analyse = f"{raw_text}{risico_zinnen_blok}"
 
                 with st.spinner(f"🔍 Risk Scanner: {doc_name}..."):
                     sentences = split_into_sentences(raw_text)
