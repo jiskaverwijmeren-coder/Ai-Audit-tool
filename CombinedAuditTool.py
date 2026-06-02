@@ -52,10 +52,14 @@ def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list) -> bytes:
                     highlight.set_colors(stroke=kleur)
                     highlight.update()
 
-    # Legenda toevoegen op de laatste pagina
+   # Legenda toevoegen op de laatste pagina, rechtsonder
     laatste_pagina = doc[-1]
-    x, y = 40, 40
-    breedte, hoogte = 220, 30 + (len(ISO_KLEUREN) * 22)
+    pagina_breedte = laatste_pagina.rect.width
+    pagina_hoogte = laatste_pagina.rect.height
+    breedte_box = 225
+    hoogte_box = 30 + (len(ISO_KLEUREN) * 22)
+    x = pagina_breedte - breedte_box - 20
+    y = pagina_hoogte - hoogte_box - 20
 
     # Witte achtergrond voor de legenda
     laatste_pagina.draw_rect(
