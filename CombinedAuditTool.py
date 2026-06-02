@@ -23,16 +23,16 @@ ISO_KLEUREN = {
     "ISO 9001": [0.2, 0.6, 1.0],    # blauw
     "ISO 14001": [0.2, 0.8, 0.2],   # groen
     "ISO 45001": [1.0, 0.4, 0.2],   # oranje/rood
+    "Risicosignaal": [1.0, 1.0, 0.0],  # geel
 }
 
-def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list) -> bytes:
+def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list, risk_results: list = []) -> bytes:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
 
-    # Highlight per bevinding met kleur op basis van norm
+    # ISO bevindingen highlighten per norm (zoals voorheen)
     for b in bevindingen:
         norm = b.get("norm", "")
-        kleur = ISO_KLEUREN.get(norm, [1.0, 1.0, 0.0])  # geel als fallback
-
+        kleur = ISO_KLEUREN.get(norm, [1.0, 1.0, 0.0])
         zoektermen = []
         beschrijving = b.get("beschrijving", "")
         if beschrijving:
@@ -43,7 +43,6 @@ def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list) -> bytes:
         titel = b.get("titel", "")
         if titel and len(titel) > 5:
             zoektermen.append(titel)
-
         for pagina in doc:
             for term in zoektermen:
                 hits = pagina.search_for(term)
@@ -51,6 +50,20 @@ def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list) -> bytes:
                     highlight = pagina.add_highlight_annot(rect)
                     highlight.set_colors(stroke=kleur)
                     highlight.update()
+
+    # Risk Scanner zinnen highlighten in geel (deze komen letterlijk uit de PDF)
+    for item in risk_results:
+        zin = item.get("sentence", "")
+        if not zin:
+            continue
+        for pagina in doc:
+            hits = pagina.search_for(zin)
+            for rect in hits:
+                highlight = pagina.add_highlight_annot(rect)
+                highlight.set_colors(stroke=[1.0, 1.0, 0.0])  # geel
+                highlight.update()
+
+    # ... rest van de legenda code blijft hetzelfde
 
     laatste_pagina = doc[-1]
     pagina_breedte = laatste_pagina.rect.width
@@ -706,7 +719,11 @@ with tab1:
 
                     if doc_name.endswith(".pdf") and doc_name in st.session_state.get("pdf_bytes_store", {}):
                         original_bytes = st.session_state.pdf_bytes_store[doc_name]
-                        highlighted_pdf = highlight_pdf_met_bevindingen(original_bytes, gefilterd)
+                        highlighted_pdf = highlight_pdf_met_bevindingen(
+                        original_bytes, 
+                        gefilterd,
+                        res["risk_results"]
+                    )
                         st.download_button(
                             "🟡 Download gemarkeerde PDF", data=highlighted_pdf,
                             file_name=f"gemarkeerd_{doc_name}",
