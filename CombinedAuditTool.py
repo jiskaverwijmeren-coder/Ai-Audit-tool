@@ -691,7 +691,8 @@ with tab1:
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             use_container_width=True, key=f"word_{doc_name}"
                         )
-                        highlighted_phrases = []
+                        
+                highlighted_phrases = []
                 if res["risk_results"]:
                   highlighted_phrases.extend([item["sentence"] for item in res["risk_results"]])
                 if res["iso_data"]["bevindingen"]:
