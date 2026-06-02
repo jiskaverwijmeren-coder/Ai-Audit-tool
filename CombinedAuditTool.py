@@ -19,39 +19,62 @@ from analyzer import analyseer_iso
 from file_reader import laad_bestand
 import fitz  # pymupdf
 
+ISO_KLEUREN = {
+    "ISO 9001": [0.2, 0.6, 1.0],    # blauw
+    "ISO 14001": [0.2, 0.8, 0.2],   # groen
+    "ISO 45001": [1.0, 0.4, 0.2],   # oranje/rood
+}
+
 def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list) -> bytes:
-    """
-    Neemt de originele PDF-bytes en een lijst van bevindingen (dicts met 'beschrijving' 
-    en/of 'titel'), en returned nieuwe PDF-bytes met gele highlights op de gevonden tekst.
-    """
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-    
-    # Verzamel alle zoektermen uit de bevindingen
-    # We zoeken op de 'beschrijving' tekst (of stukken ervan)
-    zoektermen = []
+
+    # Highlight per bevinding met kleur op basis van norm
     for b in bevindingen:
-        # Neem de eerste ~60 chars van de beschrijving als zoekterm
+        norm = b.get("norm", "")
+        kleur = ISO_KLEUREN.get(norm, [1.0, 1.0, 0.0])  # geel als fallback
+
+        zoektermen = []
         beschrijving = b.get("beschrijving", "")
         if beschrijving:
-            # Split in zinnen/stukken van max 60 chars voor betrouwbaar zoeken
             woorden = beschrijving.split()
-            chunk = " ".join(woorden[:8])  # eerste 8 woorden
+            chunk = " ".join(woorden[:8])
             if chunk:
                 zoektermen.append(chunk)
-        # Ook de titel meenemen
         titel = b.get("titel", "")
         if titel and len(titel) > 5:
             zoektermen.append(titel)
-    
-    # Highlight elke zoekterm in de PDF
-    for pagina in doc:
-        for term in zoektermen:
-            hits = pagina.search_for(term)
-            for rect in hits:
-                highlight = pagina.add_highlight_annot(rect)
-                highlight.set_colors(stroke=[1, 1, 0])  # geel
-                highlight.update()
-    
+
+        for pagina in doc:
+            for term in zoektermen:
+                hits = pagina.search_for(term)
+                for rect in hits:
+                    highlight = pagina.add_highlight_annot(rect)
+                    highlight.set_colors(stroke=kleur)
+                    highlight.update()
+
+    # Legenda toevoegen op de laatste pagina
+    laatste_pagina = doc[-1]
+    x, y = 40, 40
+    breedte, hoogte = 220, 30 + (len(ISO_KLEUREN) * 22)
+
+    # Witte achtergrond voor de legenda
+    laatste_pagina.draw_rect(
+        fitz.Rect(x - 5, y - 5, x + breedte, y + hoogte),
+        color=(0, 0, 0), fill=(1, 1, 1), width=0.5
+    )
+
+    laatste_pagina.insert_text((x, y + 12), "Legenda ISO highlights:", fontsize=9, color=(0, 0, 0), fontname="helv")
+
+    for i, (norm, kleur) in enumerate(ISO_KLEUREN.items()):
+        ry = y + 26 + (i * 22)
+        # Gekleurd blokje
+        laatste_pagina.draw_rect(
+            fitz.Rect(x, ry, x + 16, ry + 12),
+            color=kleur, fill=kleur, width=0
+        )
+        # Naam van de norm
+        laatste_pagina.insert_text((x + 22, ry + 10), norm, fontsize=8, color=(0, 0, 0), fontname="helv")
+
     return doc.tobytes()
 
 load_dotenv()
