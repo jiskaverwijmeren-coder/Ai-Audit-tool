@@ -17,6 +17,60 @@ import whisper
 from streamlit_mic_recorder import mic_recorder
 from analyzer import analyseer_iso
 from file_reader import laad_bestand
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.colors import yellow
+from reportlab.pdfgen import canvas
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+import io
+
+def highlight_text_in_pdf(original_text: str, highlighted_phrases: list, output_path: str = None) -> bytes:
+    """
+    Genereert een PDF met de gegeven tekst, waarbij de opgesomde zinnen/frases geel gemarkeerd zijn.
+
+    Args:
+        original_text: De originele tekst uit het document.
+        highlighted_phrases: Lijst met zinnen/frases die gemarkeerd moeten worden.
+        output_path: Optioneel pad om de PDF op te slaan. Als None, retourneert bytes.
+
+    Returns:
+        bytes: De gegenereerde PDF als bytes.
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+    story = []
+
+    # Voeg een custom style toe voor highlighting
+    highlighted_style = ParagraphStyle(
+        name="Highlighted",
+        parent=styles["Normal"],
+        backColor=yellow,
+        borderPadding=0,
+        borderRadius=0,
+    )
+
+    # Splits de tekst in regels en markeer de relevante delen
+    lines = original_text.split('\n')
+    for line in lines:
+        if any(phrase.lower() in line.lower() for phrase in highlighted_phrases):
+            # Markeer de hele regel als deze een highlighted frase bevat
+            story.append(Paragraph(line, highlighted_style))
+        else:
+            story.append(Paragraph(line, styles["Normal"]))
+        story.append(Spacer(1, 0.1 * inch))
+
+    doc.build(story)
+    buffer.seek(0)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+
+    if output_path:
+        with open(output_path, "wb") as f:
+            f.write(pdf_bytes)
+
+    return pdf_bytes
 
 load_dotenv()
 from supabase import create_client
@@ -551,6 +605,27 @@ with tab1:
                     file_name="auditopvolgingsvragen.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                     use_container_width=True, key="dl_totaal_vragen"
+                )
+                highlighted_phrases = []
+                if res["risk_results"]:
+                  highlighted_phrases.extend([item["sentence"] for item in res["risk_results"]])
+                if res["iso_data"]["bevindingen"]:
+                  highlighted_phrases.extend([b["beschrijving"] for b in res["iso_data"]["bevindingen"]])
+
+                # Genereer de gemarkeerde PDF
+                highlighted_pdf = highlight_text_in_pdf(
+                   original_text=res["raw_text"],
+                   highlighted_phrases=highlighted_phrases,
+                )
+
+                # Downloadknop voor de gemarkeerde PDF
+                st.download_button(
+                    label="📄 Download Document met Highlights (PDF)",
+                    data=highlighted_pdf,
+                    file_name=f"gemarkeerd_{doc_name}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key=f"highlighted_pdf_{doc_name}"
                 )
             st.divider()
 
