@@ -41,24 +41,36 @@ def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list, risk_resu
             citaat = " ".join(woorden[:8])
 
         if citaat:
+            # Splits in stukken van max 6 woorden voor betere matching per regel
+            woorden = citaat.split()
+            chunks = [" ".join(woorden[i:i+6]) for i in range(0, len(woorden), 6)]
             for pagina in doc:
-                hits = pagina.search_for(citaat)
-                for rect in hits:
-                    highlight = pagina.add_highlight_annot(rect)
-                    highlight.set_colors(stroke=kleur)
-                    highlight.update()
+                for chunk in chunks:
+                    if len(chunk) < 10:
+                        continue
+                    hits = pagina.search_for(chunk)
+                    for rect in hits:
+                        highlight = pagina.add_highlight_annot(rect)
+                        highlight.set_colors(stroke=kleur)
+                        highlight.update()
 
     # Risk Scanner zinnen highlighten in geel
     for item in risk_results:
         zin = item.get("sentence", "")
         if not zin:
             continue
+        # Splits in stukken van max 6 woorden
+        woorden = zin.split()
+        chunks = [" ".join(woorden[i:i+6]) for i in range(0, len(woorden), 6)]
         for pagina in doc:
-            hits = pagina.search_for(zin)
-            for rect in hits:
-                highlight = pagina.add_highlight_annot(rect)
-                highlight.set_colors(stroke=[1.0, 1.0, 0.0])
-                highlight.update()
+            for chunk in chunks:
+                if len(chunk) < 10:
+                    continue
+                hits = pagina.search_for(chunk)
+                for rect in hits:
+                    highlight = pagina.add_highlight_annot(rect)
+                    highlight.set_colors(stroke=[1.0, 1.0, 0.0])
+                    highlight.update()
 
     # Legenda rechtsonder op de laatste pagina
     laatste_pagina = doc[-1]
