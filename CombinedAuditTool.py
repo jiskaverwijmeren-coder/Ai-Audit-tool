@@ -574,10 +574,10 @@ with tab1:
                     risico_zinnen_blok = f"\n\nAL GEDETECTEERDE RISICOZINNEN (gebruik dit als extra context):\n{risico_zinnen}"
                 
                 if project_context:
-                with st.spinner(f"🔍 Risk Scanner: {doc_name}..."):
-                    sentences = split_into_sentences(raw_text)
-                    detected = detect_problem_sentences(sentences, threshold=threshold)
-                
+                    with st.spinner(f"🔍 Risk Scanner: {doc_name}..."):
+                        sentences = split_into_sentences(raw_text)
+                        detected = detect_problem_sentences(sentences, threshold=threshold)
+                    
                 risico_zinnen_blok = ""
                 if detected:
                     risico_zinnen = "\n".join([f"- {r['sentence']} ({r['issue_type']})" for r in detected])
