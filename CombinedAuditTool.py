@@ -24,26 +24,38 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 import io
+from reportlab.lib.colors import Color, black
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.platypus import Paragraph, Spacer
 
 def highlight_text_in_pdf(original_text: str, highlighted_phrases: list) -> bytes:
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+
+    # Stijlen definieren
     styles = getSampleStyleSheet()
+    normal_style = styles["Normal"]
+    normal_style.fontName = "Helvetica"
+    normal_style.fontSize = 10
+    normal_style.leading = 12
+    normal_style.textColor = black
+    normal_style.spaceAfter = 6  # Ruimte na elke alinea
 
-    # Pas de stijlen aan voor betere leesbaarheid
-    styles["Normal"].fontSize = 10
-    styles["Normal"].leading = 12  # Regelafstand
-    styles["Normal"].spaceAfter = 6  # Ruimte na elke alinea
-
-    # Stijl voor gemarkeerde tekst (dikkere rand + felgeel)
+    # Stijl voor gemarkeerde tekst: felgeel
     highlighted_style = ParagraphStyle(
         name="Highlighted",
-        parent=styles["Normal"],
-        backColor=yellow,
-        borderColor="black",
+        parent=normal_style,
+        backColor=Color(255/255, 255/255, 200/255),  # Felgeel
+        borderColor=Color(255/255, 255/255, 0/255),  # Gele rand
         borderWidth=0.5,
         borderPadding=2,
-        borderRadius=0,
         spaceAfter=6,
     )
 
@@ -52,14 +64,16 @@ def highlight_text_in_pdf(original_text: str, highlighted_phrases: list) -> byte
     # Splits de tekst in alinea's (op basis van dubbele newlines)
     paragraphs = original_text.split('\n\n')
     for paragraph in paragraphs:
+        # Splits elke alinea in regels
         lines = paragraph.split('\n')
         for line in lines:
             if line.strip():  # Alleen niet-lege regels verwerken
+                # Controleer of de regel een gemarkeerde frase bevat
                 if any(phrase.lower() in line.lower() for phrase in highlighted_phrases):
                     story.append(Paragraph(line, highlighted_style))
                 else:
-                    story.append(Paragraph(line, styles["Normal"]))
-        # Voeg een kleine ruimte toe tussen alinea's
+                    story.append(Paragraph(line, normal_style))
+        # Voeg een witregel toe tussen alinea's
         story.append(Spacer(1, 0.2 * inch))
 
     doc.build(story)
