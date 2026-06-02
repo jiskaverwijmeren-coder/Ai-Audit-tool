@@ -25,51 +25,47 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 import io
 
-def highlight_text_in_pdf(original_text: str, highlighted_phrases: list, output_path: str = None) -> bytes:
-    """
-    Genereert een PDF met de gegeven tekst, waarbij de opgesomde zinnen/frases geel gemarkeerd zijn.
-
-    Args:
-        original_text: De originele tekst uit het document.
-        highlighted_phrases: Lijst met zinnen/frases die gemarkeerd moeten worden.
-        output_path: Optioneel pad om de PDF op te slaan. Als None, retourneert bytes.
-
-    Returns:
-        bytes: De gegenereerde PDF als bytes.
-    """
+def highlight_text_in_pdf(original_text: str, highlighted_phrases: list) -> bytes:
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
     styles = getSampleStyleSheet()
-    story = []
 
-    # Voeg een custom style toe voor highlighting
+    # Pas de stijlen aan voor betere leesbaarheid
+    styles["Normal"].fontSize = 10
+    styles["Normal"].leading = 12  # Regelafstand
+    styles["Normal"].spaceAfter = 6  # Ruimte na elke alinea
+
+    # Stijl voor gemarkeerde tekst (dikkere rand + felgeel)
     highlighted_style = ParagraphStyle(
         name="Highlighted",
         parent=styles["Normal"],
         backColor=yellow,
-        borderPadding=0,
+        borderColor="black",
+        borderWidth=0.5,
+        borderPadding=2,
         borderRadius=0,
+        spaceAfter=6,
     )
 
-    # Splits de tekst in regels en markeer de relevante delen
-    lines = original_text.split('\n')
-    for line in lines:
-        if any(phrase.lower() in line.lower() for phrase in highlighted_phrases):
-            # Markeer de hele regel als deze een highlighted frase bevat
-            story.append(Paragraph(line, highlighted_style))
-        else:
-            story.append(Paragraph(line, styles["Normal"]))
-        story.append(Spacer(1, 0.1 * inch))
+    story = []
+
+    # Splits de tekst in alinea's (op basis van dubbele newlines)
+    paragraphs = original_text.split('\n\n')
+    for paragraph in paragraphs:
+        lines = paragraph.split('\n')
+        for line in lines:
+            if line.strip():  # Alleen niet-lege regels verwerken
+                if any(phrase.lower() in line.lower() for phrase in highlighted_phrases):
+                    story.append(Paragraph(line, highlighted_style))
+                else:
+                    story.append(Paragraph(line, styles["Normal"]))
+        # Voeg een kleine ruimte toe tussen alinea's
+        story.append(Spacer(1, 0.2 * inch))
 
     doc.build(story)
     buffer.seek(0)
     pdf_bytes = buffer.getvalue()
     buffer.close()
-
-    if output_path:
-        with open(output_path, "wb") as f:
-            f.write(pdf_bytes)
-
     return pdf_bytes
 
 load_dotenv()
