@@ -714,7 +714,7 @@ with tab1:
                     key=f"highlighted_pdf_{doc_name}"
                 )
 
-                    st.write("")
+                st.write("")
                     for b in gefilterd:
                         ernst_kleur = {"hoog": "🔴", "gemiddeld": "🟠", "laag": "🟡"}.get(b["ernst"], "⚪")
                         with st.expander(f"{ernst_kleur} [{b['norm']} | {b['clausule']}] {b['titel']}"):
