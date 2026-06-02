@@ -17,6 +17,42 @@ import whisper
 from streamlit_mic_recorder import mic_recorder
 from analyzer import analyseer_iso
 from file_reader import laad_bestand
+import fitz  # pymupdf
+
+def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list) -> bytes:
+    """
+    Neemt de originele PDF-bytes en een lijst van bevindingen (dicts met 'beschrijving' 
+    en/of 'titel'), en returned nieuwe PDF-bytes met gele highlights op de gevonden tekst.
+    """
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    
+    # Verzamel alle zoektermen uit de bevindingen
+    # We zoeken op de 'beschrijving' tekst (of stukken ervan)
+    zoektermen = []
+    for b in bevindingen:
+        # Neem de eerste ~60 chars van de beschrijving als zoekterm
+        beschrijving = b.get("beschrijving", "")
+        if beschrijving:
+            # Split in zinnen/stukken van max 60 chars voor betrouwbaar zoeken
+            woorden = beschrijving.split()
+            chunk = " ".join(woorden[:8])  # eerste 8 woorden
+            if chunk:
+                zoektermen.append(chunk)
+        # Ook de titel meenemen
+        titel = b.get("titel", "")
+        if titel and len(titel) > 5:
+            zoektermen.append(titel)
+    
+    # Highlight elke zoekterm in de PDF
+    for pagina in doc:
+        for term in zoektermen:
+            hits = pagina.search_for(term)
+            for rect in hits:
+                highlight = pagina.add_highlight_annot(rect)
+                highlight.set_colors(stroke=[1, 1, 0])  # geel
+                highlight.update()
+    
+    return doc.tobytes()
 
 load_dotenv()
 from supabase import create_client
@@ -416,13 +452,17 @@ with tab1:
         added = 0
         for uf in uploaded_files:
             if uf.name not in existing_names:
-                text = extract_text_from_pdf(uf) if uf.type == "application/pdf" else uf.read().decode("utf-8")
+                if uf.type == "application/pdf":
+                    pdf_bytes = uf.read()
+                    if "pdf_bytes_store" not in st.session_state:
+                        st.session_state.pdf_bytes_store = {}
+                    st.session_state.pdf_bytes_store[uf.name] = pdf_bytes
+                    text = extract_text_from_pdf(io.BytesIO(pdf_bytes))
+                else:
+                    text = uf.read().decode("utf-8")
                 if text.strip():
                     st.session_state.document_list.append({"name": uf.name, "text": text})
                     added += 1
-        if added:
-            st.success(f"✅ {added} nieuw(e) document(en) toegevoegd.")
-            st.rerun()
 
     st.divider()
     st.subheader("📋 Documentenlijst")
@@ -636,6 +676,16 @@ with tab1:
                             file_name=f"rapport_{doc_name}.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             use_container_width=True, key=f"word_{doc_name}"
+                        )
+
+                    if doc_name.endswith(".pdf") and doc_name in st.session_state.get("pdf_bytes_store", {}):
+                        original_bytes = st.session_state.pdf_bytes_store[doc_name]
+                        highlighted_pdf = highlight_pdf_met_bevindingen(original_bytes, gefilterd)
+                        st.download_button(
+                            "🟡 Download gemarkeerde PDF", data=highlighted_pdf,
+                            file_name=f"gemarkeerd_{doc_name}",
+                            mime="application/pdf",
+                            use_container_width=True, key=f"pdf_hl_{doc_name}"
                         )
 
                     st.write("")
