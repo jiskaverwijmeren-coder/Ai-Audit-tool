@@ -52,7 +52,7 @@ def highlight_pdf_met_bevindingen(pdf_bytes: bytes, bevindingen: list) -> bytes:
                     highlight.set_colors(stroke=kleur)
                     highlight.update()
 
-   laatste_pagina = doc[-1]
+    laatste_pagina = doc[-1]
     pagina_breedte = laatste_pagina.rect.width
     pagina_hoogte = laatste_pagina.rect.height
     breedte_box = 225
