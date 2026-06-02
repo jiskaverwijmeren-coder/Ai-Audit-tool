@@ -715,7 +715,7 @@ with tab1:
                 )
 
                 st.write("")
-                    for b in gefilterd:
+                for b in gefilterd:
                         ernst_kleur = {"hoog": "🔴", "gemiddeld": "🟠", "laag": "🟡"}.get(b["ernst"], "⚪")
                         with st.expander(f"{ernst_kleur} [{b['norm']} | {b['clausule']}] {b['titel']}"):
                             st.markdown(f"**Ernst:** {b['ernst'].capitalize()}")
